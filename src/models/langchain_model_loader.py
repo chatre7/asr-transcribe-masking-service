@@ -1,0 +1,97 @@
+from langchain.chat_models import init_chat_model
+from langchain_openai import ChatOpenAI
+from typing import Optional, Dict, Any
+import os
+
+from src.config.settings import settings
+
+class LangchainModelLoader:
+    def __init__(self):
+        self.models = {}
+        self._setup_api_keys()
+
+    def _setup_api_keys(self):
+        if settings.OPENAI_API_KEY:
+            os.environ["OPENAI_API_KEY"] = settings.OPENAI_API_KEY
+            os.environ["OPENAI_MODEL_BASIC"] = settings.OPENAI_MODEL_BASIC
+            os.environ["OPENAI_MODEL_REASONING"] = settings.OPENAI_MODEL_REASONING
+        if settings.INFERENCE_SERVER_API_KEY:
+            os.environ["INFERENCE_SERVER_API_KEY"] = settings.INFERENCE_SERVER_API_KEY
+            os.environ["INFERENCE_SERVER_MODEL_BASIC"] = settings.INFERENCE_SERVER_MODEL_BASIC
+            os.environ["INFERENCE_SERVER_URL"] = settings.INFERENCE_SERVER_URL
+
+    def _get_openai_config(self, **kwargs):
+        config = {"temperature": kwargs.get("temperature", 0.0)}
+        config["max_retries"] = kwargs.get("max_retries", 0)
+        if "api_key" in kwargs:
+            config["api_key"] = kwargs["api_key"]
+        elif settings.OPENAI_API_KEY:
+            config["api_key"] = settings.OPENAI_API_KEY
+        config.update({k: v for k, v in kwargs.items() if k not in ("temperature",)})
+        return config
+
+    def _get_deepseek_config(self, **kwargs) -> Dict[str, Any]:
+        config = {"temperature": kwargs.get("temperature", 0.0)}
+        if "api_key" in kwargs:
+            config["api_key"] = kwargs["api_key"]
+        elif settings.DEEPSEEK_API_KEY:
+            config["api_key"] = settings.DEEPSEEK_API_KEY
+        config.update({k: v for k, v in kwargs.items() if k != "temperature"})
+        return config
+
+    def init_model_openai_basic(self, temperature: float = 0.0, **kwargs) -> Any:
+        config = self._get_openai_config(temperature=temperature, **kwargs)
+        model = init_chat_model(model=settings.OPENAI_MODEL_BASIC, **config)
+        self.models["openai_basic"] = model
+        return model
+
+    def init_model_openai_reasoning(self, temperature: float = 0.0, **kwargs) -> Any:
+        config = self._get_openai_config(temperature=temperature, **kwargs)
+        model = init_chat_model(model=settings.OPENAI_MODEL_REASONING, **config)
+        self.models["openai_reasoning"] = model
+        return model
+
+    def init_model_deepseek_basic(self, temperature: float = 0.0, **kwargs) -> Any:
+        config = self._get_deepseek_config(temperature=temperature, **kwargs)
+        model = init_chat_model(model=settings.DEEPSEEK_MODEL_BASIC, **config)
+        self.models["deepseek_basic"] = model
+        return model
+
+    def init_model_deepseek_reasoning(self, temperature: float = 0.0, **kwargs) -> Any:
+        config = self._get_deepseek_config(temperature=temperature, **kwargs)
+        model = init_chat_model(model=settings.DEEPSEEK_MODEL_REASONING, **config)
+        self.models["deepseek_reasoning"] = model
+        return model
+
+    def init_chat_model_inference_server(self, temperature: float = 0.0, **kwargs) -> Any:
+        config = {"temperature": temperature}
+        api_key = None
+        if "api_key" in kwargs:
+            api_key = kwargs["api_key"]
+        elif settings.INFERENCE_SERVER_API_KEY:
+            api_key = settings.INFERENCE_SERVER_API_KEY
+        config.update({k: v for k, v in kwargs.items() if k != "temperature"})
+        
+        # Build ChatOpenAI parameters conditionally
+        chat_params = {
+            "model": settings.INFERENCE_SERVER_MODEL_BASIC,
+            "temperature": temperature,
+            "top_p": kwargs.get("top_p", 0.90),
+            "openai_api_base": settings.INFERENCE_SERVER_URL,
+            "max_retries": 0,
+            "timeout": 1200
+        }
+        
+        # Only add openai_api_key if it exists
+        if api_key:
+            chat_params["openai_api_key"] = api_key
+        
+        model = ChatOpenAI(**chat_params)
+        self.models["inference_server"] = model
+        return model
+
+    def get_model(self, model_name: str) -> Optional[Any]:
+        return self.models.get(model_name)
+
+    def list_available_models(self) -> list:
+        return list(self.models.keys())

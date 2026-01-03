@@ -1,0 +1,35 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Environment variables
+.env
+
+.ruff_cache
+
+# Examples
+examples/
+
+# Logs
+logs/
+
+asr-service-api.tar
+
+/models_cache/
+
+src/data/
+
+asr_models_cache/
+
+asr-service-with-models.tar
+
+asr-service.tar
+*.tar
+*.tart
