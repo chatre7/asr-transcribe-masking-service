@@ -11,6 +11,7 @@ This service provides enterprise-grade ASR (Automatic Speech Recognition) capabi
 ### 🎤 ASR Transcription
 - **Multiple Model Support**: Typhoon, Pathumma, and Pathumma-noise models
 - **Parallel Processing**: Process audio with multiple models simultaneously
+- **Typhoon-only Path**: Fast single-model transcription when you don't need comparison
 - **Smart Model Selection**: AI-powered model selection based on audio context
 - **Chunk-based Processing**: Efficient handling of large audio files
 - **Memory Management**: Optimized for production workloads
@@ -96,6 +97,15 @@ Content-Type: multipart/form-data
 
 file: <wav_file>
 with_transcription: true/false
+```
+
+#### Process WAV File (Typhoon-only)
+```http
+POST /api/v1/process_wav_file_typhoon
+Content-Type: multipart/form-data
+
+file: <wav_file>
+include_transcript: true/false
 ```
 
 #### Process JSON Transcript
