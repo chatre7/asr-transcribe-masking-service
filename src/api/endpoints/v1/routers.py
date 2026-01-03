@@ -6,9 +6,10 @@ from src.api.endpoints.v1 import (
     process_file2choose_model,
     process_json_transcript,
     process_qa_auditor,
+    process_unified_stereo,
     process_wav2file,
     process_wav_file,
-    process_unified_stereo,
+    process_wav_file_typhoon,
 )
 
 # Create v1 router
@@ -21,6 +22,9 @@ v1_router.include_router(
 )
 v1_router.include_router(process_qa_auditor.router, prefix="/process_qa_auditor")
 v1_router.include_router(process_wav_file.router, prefix="/process_wav_file")
+v1_router.include_router(
+    process_wav_file_typhoon.router, prefix="/process_wav_file_typhoon"
+)
 v1_router.include_router(process_wav2file.router, prefix="/process_wav2file")
 v1_router.include_router(
     process_file2choose_model.router, prefix="/process_file2choose_model"
