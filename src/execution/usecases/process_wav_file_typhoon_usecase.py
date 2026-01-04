@@ -1,6 +1,12 @@
+import io
 from typing import Any, Dict
 
+import soundfile as sf
+
 from src.config.logs_config import get_logger
+from src.execution.actions.process_unified_stereo_action import (
+    ProcessUnifiedStereoAction,
+)
 from src.execution.actions.process_wav_file_typhoon_action import (
     ProcessWavFileTyphoonAction,
 )
@@ -38,6 +44,20 @@ class ProcessWavFileTyphoonUseCase:
             "validation": "passed",
         }
 
+        if self._is_stereo(file_content):
+            logger.info(
+                "Stereo input detected for Typhoon-only endpoint; using unified stereo pipeline"
+            )
+            stereo_action = ProcessUnifiedStereoAction()
+            stereo_result = await stereo_action.execute(
+                file_content=file_content,
+                filename=filename,
+                force_model="typhoon",
+                skip_model_selection=True,
+                auto_continue=False,
+            )
+            return stereo_result
+
         result = await self.action.execute(file_content, filename)
 
         transcript = None
@@ -64,3 +84,11 @@ class ProcessWavFileTyphoonUseCase:
             end_sec = float(item.get("end_sec", 0))
             lines.append(f"[{start_sec:.2f} --> {end_sec:.2f}] [Unknown]: {text}")
         return "\n".join(lines)
+
+    def _is_stereo(self, file_content: bytes) -> bool:
+        try:
+            info = sf.info(io.BytesIO(file_content))
+            return info.channels and info.channels >= 2
+        except Exception as e:
+            logger.warning(f"Failed to inspect audio channels: {e}")
+            return False

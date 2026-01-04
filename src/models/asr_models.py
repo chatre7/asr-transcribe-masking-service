@@ -1,6 +1,9 @@
 import asyncio
 import gc
+import json
 import os
+import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -86,7 +89,6 @@ class TyphoonASR(ASRModelBase):
         if self._transcribe_fn is None:
             return {"text": "", "error": "Typhoon model not available"}
 
-        import os
         import tempfile
 
         try:
@@ -108,6 +110,11 @@ class TyphoonASR(ASRModelBase):
                     text = str(result)
 
                 return {"text": text, "error": None}
+            except Exception as e:
+                if "CUDA out of memory" in str(e) or "out of memory" in str(e).lower():
+                    logger.warning("Typhoon GPU OOM detected; retrying on CPU fallback")
+                    return self._transcribe_cpu_fallback(temp_file_path)
+                raise
             finally:
                 # Clean up temp file
                 try:
@@ -120,6 +127,34 @@ class TyphoonASR(ASRModelBase):
         except Exception as e:
             logger.error(f"Typhoon transcription error: {e}")
             return {"text": "", "error": str(e)}
+
+    def _transcribe_cpu_fallback(self, audio_path: str) -> Dict[str, Any]:
+        """Run Typhoon transcription in a CPU-only subprocess to avoid GPU OOM."""
+        script = (
+            "import json, os\n"
+            "os.environ['CUDA_VISIBLE_DEVICES'] = '-1'\n"
+            "from typhoon_asr import transcribe\n"
+            "result = transcribe(r'''%s''')\n"
+            "if isinstance(result, dict):\n"
+            "    text = result.get('text', str(result))\n"
+            "else:\n"
+            "    text = result\n"
+            "print(json.dumps({'text': text}))\n"
+        ) % audio_path.replace("'", "''")
+
+        try:
+            completed = subprocess.run(
+                [sys.executable, "-c", script],
+                capture_output=True,
+                text=True,
+                check=True,
+                env={**os.environ, "CUDA_VISIBLE_DEVICES": "-1"},
+            )
+            payload = json.loads(completed.stdout.strip() or "{}")
+            return {"text": payload.get("text", ""), "error": None}
+        except Exception as e:
+            logger.error(f"Typhoon CPU fallback failed: {e}")
+            return {"text": "", "error": f"CPU fallback failed: {str(e)}"}
 
     def unload_model(self):
         """Unload Typhoon model from memory"""
